@@ -1,13 +1,18 @@
+import re
 from datetime import datetime as dt
 from enum import Enum
 
 from flask import Flask, Response, json, request
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import validates
 
 app = Flask(__name__)
+#  TODO: move it to .env
+app.config['SECRET_KEY'] = 'supersecretkey'
 app.config[
     'SQLALCHEMY_DATABASE_URI'
 ] = 'postgresql://postgres:postgres@localhost:5432/tickets'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
@@ -35,6 +40,16 @@ class Ticket(db.Model):
     )
     comments = db.relationship('Comment', cascade='all,delete')
 
+    @validates('email')
+    def validate_email(self, key, email):
+        if not email or not re.match(
+            r'^[A-Za-z0-9\.\+_-]+@[A-Za-z0-9\._-]+\.[a-zA-Z]*$', email
+        ):
+            raise AssertionError(
+                'Provided value is not a valid e-mail address.'
+            )
+        return email
+
 
 class Comment(db.Model):
     __tablename__ = 'comments'
@@ -44,6 +59,16 @@ class Comment(db.Model):
     created_at = db.Column(db.DateTime, index=True, default=dt.utcnow())
     email = db.Column(db.String(length=255), index=True)
     text = db.Column(db.String)
+
+    @validates('email')
+    def validate_email(self, key, email):
+        if not email or not re.match(
+            r'^[A-Za-z0-9\.\+_-]+@[A-Za-z0-9\._-]+\.[a-zA-Z]*$', email
+        ):
+            raise AssertionError(
+                'Provided value is not a valid e-mail address.'
+            )
+        return email
 
 
 def db_obj_to_dict(obj: db.Model) -> dict:
@@ -72,11 +97,21 @@ def check_ticket_status(ticket: Ticket, new_status: TicketStatus) -> bool:
 
 @app.route('/ticket', methods=['POST'])
 def create_ticket():
-    ticket = Ticket(
-        theme=request.form['theme'],
-        text=request.form['text'],
-        email=request.form['email'],
-    )
+    try:
+        theme = request.form['theme']
+        text = request.form['text']
+        email = request.form['email']
+    except:
+        return Response(
+            response=(
+                '"theme", "text" and "email" is required as form-data strings.'
+            ),
+            status=400,
+        )
+    try:
+        ticket = Ticket(theme=theme, text=text, email=email)
+    except Exception as e:
+        return Response(response=str(e), status=400)
     db.session.add(ticket)
     db.session.commit()
     db.session.refresh(ticket)
@@ -126,7 +161,8 @@ def get_or_change_ticket(ticket_id):
             db.session.refresh(ticket)
             return Response(
                 response=json.dumps(
-                    db_obj_to_dict(ticket), default=custom_encoder
+                    {**db_obj_to_dict(ticket), **comments},
+                    default=custom_encoder,
                 ),
                 status=200,
                 content_type='application/json',
@@ -146,11 +182,20 @@ def get_or_change_ticket(ticket_id):
 @app.route('/ticket/<int:ticket_id>/comment', methods=['POST'])
 def create_comment(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
-    comment = Comment(
-        ticket_id=ticket.id,
-        text=request.form['text'],
-        email=request.form['email'],
-    )
+    if ticket.status == TicketStatus.closed:
+        return Response(response='Commenting closed tickets is unavailable.')
+    try:
+        text = request.form['text']
+        email = request.form['email']
+    except:
+        return Response(
+            response='"text" and "email" is required as form-data strings.',
+            status=400,
+        )
+    try:
+        comment = Comment(ticket_id=ticket.id, text=text, email=email)
+    except Exception as e:
+        return Response(response=str(e), status=400)
     db.session.add(comment)
     db.session.commit()
     db.session.refresh(comment)
