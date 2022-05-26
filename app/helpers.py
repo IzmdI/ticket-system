@@ -54,11 +54,13 @@ def check_ticket_status(
     current_status: TicketStatus, new_status: TicketStatus
 ) -> bool:
     return (
-        current_status == TicketStatus.opened
-        or current_status == TicketStatus.awaited
-        and new_status in (TicketStatus.answered, TicketStatus.closed)
-        or current_status == TicketStatus.answered
-        and new_status in (TicketStatus.awaited, TicketStatus.closed)
+        new_status in (TicketStatus.answered, TicketStatus.closed)
+        and (
+            current_status == TicketStatus.opened
+            or current_status == TicketStatus.awaited
+        )
+        or new_status in (TicketStatus.awaited, TicketStatus.closed)
+        and current_status == TicketStatus.answered
     )
 
 
