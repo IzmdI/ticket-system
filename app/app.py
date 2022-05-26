@@ -1,19 +1,17 @@
 from datetime import datetime as dt
 
-import redis
 from flask import Response, json, request
 
-from db_models import Comment, Ticket, TicketStatus, db
-from helpers import (
+from .db_models import Comment, Ticket, TicketStatus, db
+from .helpers import (
     check_ticket_status,
     create_app,
     custom_encoder,
     db_obj_to_dict,
     get_ticket_response,
+    redis_client,
 )
 
-#  TODO: set redis path through env
-redis_client = redis.Redis()
 app = create_app()
 
 
@@ -75,7 +73,7 @@ def get_or_change_ticket(ticket_id):
                 ),
                 status=400,
             )
-        if check_ticket_status(ticket, new_status):
+        if check_ticket_status(ticket.status, new_status):
             ticket.status = new_status
             ticket.updated_at = dt.utcnow()
             db.session.commit()
@@ -109,7 +107,6 @@ def get_or_change_ticket(ticket_id):
 def create_comment(ticket_id):
     ticket = redis_client.get(f'ticket_{ticket_id}')
     if ticket:
-        ticket = ticket.decode('utf-8')
         ticket_status = TicketStatus(json.loads(ticket)['status'])
     else:
         ticket = Ticket.query.get_or_404(ticket_id)
@@ -141,8 +138,3 @@ def create_comment(ticket_id):
     return Response(
         response=json_comment, status=201, content_type='application/json'
     )
-
-
-if __name__ == '__main__':
-    db.create_all()
-    app.run(host='0.0.0.0', port=8000)

@@ -1,0 +1,53 @@
+version: "3.3"
+
+volumes:
+  postgres_data:
+
+networks:
+  ticket-system:
+    name: ticket-system
+    driver: bridge
+
+services:
+
+  db:
+    image: postgres:14.3
+    container_name: db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    restart: always
+    ports:
+      - 5432:5432
+    env_file:
+      - ./.env
+    networks:
+      - ticket-system
+
+  redis:
+    container_name: redis-service
+    image: redis:7.0-alpine
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    ports:
+      - 6379:6379
+    env_file:
+      - ./.env
+    networks:
+      - ticket-system
+
+  web:
+    container_name: web
+    build:
+      context: .
+      dockerfile: ./app/Dockerfile
+    restart: always
+    ports:
+      - 8000:8000
+    depends_on:
+      - db
+      - redis
+    command: uwsgi --socket 0.0.0.0:8000 --protocol=http -w wsgi:app
+    env_file:
+      - ./.env
+    networks:
+      - ticket-system

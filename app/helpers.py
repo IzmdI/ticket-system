@@ -1,24 +1,38 @@
+import os
 from datetime import datetime as dt
 from enum import Enum
 from typing import Any
 
+import redis
 from flask import Flask, json
 from redis import Redis
 
-from db_models import Comment, Ticket, TicketStatus, db
+from .db_models import Comment, Ticket, TicketStatus, db
+
+redis_client = redis.Redis().from_url(
+    url=os.environ['REDIS_URL'],
+    encoding='utf-8',
+    decode_responses=True,
+    username=os.environ['REDIS_USER'],
+    password=os.environ['REDIS_PASSWORD'],
+)
 
 
 def create_app():
     app = Flask(__name__)
-    #  TODO: move it to .env
-    app.config['SECRET_KEY'] = 'supersecretkey'
-    app.config[
-        'SQLALCHEMY_DATABASE_URI'
-    ] = 'postgresql://postgres:postgres@localhost:5432/tickets'
-    app.config['REDIS_EXPIRE_TIME'] = 60 * 2
+    app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "default")
+    app.config['SQLALCHEMY_DATABASE_URI'] = ''.join(
+        (
+            f"postgresql://{os.environ['POSTGRES_USER']}:",
+            f"{os.environ['POSTGRES_PASSWORD']}@db:5432/",
+            f"{os.environ['POSTGRES_DB']}",
+        )
+    )
+    app.config['REDIS_EXPIRE_TIME'] = int(os.environ['REDIS_EXPIRE_TIME'])
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
     app.app_context().push()
+    db.create_all()
     return app
 
 
@@ -50,19 +64,13 @@ def check_ticket_status(
 
 def get_ticket_response(ticket_id: int, redis_client: Redis):
     ticket = redis_client.get(f'ticket_{ticket_id}')
-    if ticket:
-        ticket = ticket.decode('utf-8')
-    else:
+    if not ticket:
         ticket = Ticket.query.get_or_404(ticket_id)
     comments = redis_client.mget(
         redis_client.scan(match=f'ticket_{ticket_id}_comment_*')[-1]
     )
     if comments:
-        comments = {
-            'comments': [
-                json.loads(comment.decode('utf-8')) for comment in comments
-            ]
-        }
+        comments = {'comments': [json.loads(comment) for comment in comments]}
     else:
         comments = {
             'comments': [
