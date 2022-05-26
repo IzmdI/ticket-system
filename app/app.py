@@ -1,98 +1,20 @@
-import re
 from datetime import datetime as dt
-from enum import Enum
 
-from flask import Flask, Response, json, request
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import validates
+import redis
+from flask import Response, json, request
 
-app = Flask(__name__)
-#  TODO: move it to .env
-app.config['SECRET_KEY'] = 'supersecretkey'
-app.config[
-    'SQLALCHEMY_DATABASE_URI'
-] = 'postgresql://postgres:postgres@localhost:5432/tickets'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
+from db_models import Comment, Ticket, TicketStatus, db
+from helpers import (
+    check_ticket_status,
+    create_app,
+    custom_encoder,
+    db_obj_to_dict,
+    get_ticket_response,
+)
 
-
-class TicketStatus(Enum):
-    opened = 'opened'
-    closed = 'closed'
-    awaited = 'awaited'
-    answered = 'answered'
-
-
-class Ticket(db.Model):
-    __tablename__ = 'tickets'
-
-    id = db.Column(db.Integer, primary_key=True, index=True)
-    created_at = db.Column(db.DateTime, index=True, default=dt.utcnow())
-    updated_at = db.Column(db.DateTime, index=True, default=dt.utcnow())
-    theme = db.Column(db.String, index=True)
-    text = db.Column(db.String)
-    email = db.Column(db.String(length=255), index=True)
-    status = db.Column(
-        db.Enum(TicketStatus),
-        default=TicketStatus.opened,
-        index=True,
-        nullable=False,
-    )
-    comments = db.relationship('Comment', cascade='all,delete')
-
-    @validates('email')
-    def validate_email(self, key, email):
-        if not email or not re.match(
-            r'^[A-Za-z0-9\.\+_-]+@[A-Za-z0-9\._-]+\.[a-zA-Z]*$', email
-        ):
-            raise AssertionError(
-                'Provided value is not a valid e-mail address.'
-            )
-        return email
-
-
-class Comment(db.Model):
-    __tablename__ = 'comments'
-
-    id = db.Column(db.Integer, primary_key=True, index=True)
-    ticket_id = db.Column(db.Integer, db.ForeignKey('tickets.id'))
-    created_at = db.Column(db.DateTime, index=True, default=dt.utcnow())
-    email = db.Column(db.String(length=255), index=True)
-    text = db.Column(db.String)
-
-    @validates('email')
-    def validate_email(self, key, email):
-        if not email or not re.match(
-            r'^[A-Za-z0-9\.\+_-]+@[A-Za-z0-9\._-]+\.[a-zA-Z]*$', email
-        ):
-            raise AssertionError(
-                'Provided value is not a valid e-mail address.'
-            )
-        return email
-
-
-def db_obj_to_dict(obj: db.Model) -> dict:
-    return {
-        column.name: getattr(obj, column.name)
-        for column in obj.__table__.columns
-    }
-
-
-def custom_encoder(obj):
-    if isinstance(obj, dt):
-        return obj.isoformat()
-    if isinstance(obj, Enum):
-        return obj.name
-
-
-def check_ticket_status(ticket: Ticket, new_status: TicketStatus) -> bool:
-    return (
-        ticket.status == TicketStatus.opened
-        or ticket.status == TicketStatus.awaited
-        and new_status in (TicketStatus.answered, TicketStatus.closed)
-        or ticket.status == TicketStatus.answered
-        and new_status in (TicketStatus.awaited, TicketStatus.closed)
-    )
+#  TODO: set redis path through env
+redis_client = redis.Redis()
+app = create_app()
 
 
 @app.route('/ticket', methods=['POST'])
@@ -115,8 +37,12 @@ def create_ticket():
     db.session.add(ticket)
     db.session.commit()
     db.session.refresh(ticket)
+    json_ticket = json.dumps(db_obj_to_dict(ticket), default=custom_encoder)
+    redis_client.set(
+        f'ticket_{ticket.id}', json_ticket, ex=app.config['REDIS_EXPIRE_TIME']
+    )
     return Response(
-        response=json.dumps(db_obj_to_dict(ticket), default=custom_encoder),
+        response=get_ticket_response(ticket.id, redis_client),
         status=201,
         content_type='application/json',
     )
@@ -124,19 +50,14 @@ def create_ticket():
 
 @app.route('/ticket/<int:ticket_id>', methods=['GET', 'PUT'])
 def get_or_change_ticket(ticket_id):
-    ticket = Ticket.query.get_or_404(ticket_id)
-    comments = {
-        'comments': [db_obj_to_dict(comment) for comment in ticket.comments]
-    }
     if request.method == 'GET':
         return Response(
-            response=json.dumps(
-                {**db_obj_to_dict(ticket), **comments}, default=custom_encoder
-            ),
+            response=get_ticket_response(ticket_id, redis_client),
             status=200,
             content_type='application/json',
         )
     if request.method == 'PUT':
+        ticket = Ticket.query.get_or_404(ticket_id)
         if ticket.status == TicketStatus.closed:
             return Response(
                 response='Closed ticket can\'t be changed.', status=400
@@ -159,11 +80,16 @@ def get_or_change_ticket(ticket_id):
             ticket.updated_at = dt.utcnow()
             db.session.commit()
             db.session.refresh(ticket)
+            json_ticket = json.dumps(
+                db_obj_to_dict(ticket), default=custom_encoder
+            )
+            redis_client.set(
+                f'ticket_{ticket.id}',
+                json_ticket,
+                ex=app.config['REDIS_EXPIRE_TIME'],
+            )
             return Response(
-                response=json.dumps(
-                    {**db_obj_to_dict(ticket), **comments},
-                    default=custom_encoder,
-                ),
+                response=get_ticket_response(ticket_id, redis_client),
                 status=200,
                 content_type='application/json',
             )
@@ -181,8 +107,14 @@ def get_or_change_ticket(ticket_id):
 
 @app.route('/ticket/<int:ticket_id>/comment', methods=['POST'])
 def create_comment(ticket_id):
-    ticket = Ticket.query.get_or_404(ticket_id)
-    if ticket.status == TicketStatus.closed:
+    ticket = redis_client.get(f'ticket_{ticket_id}')
+    if ticket:
+        ticket = ticket.decode('utf-8')
+        ticket_status = TicketStatus(json.loads(ticket)['status'])
+    else:
+        ticket = Ticket.query.get_or_404(ticket_id)
+        ticket_status = ticket.status
+    if ticket_status == TicketStatus.closed:
         return Response(response='Commenting closed tickets is unavailable.')
     try:
         text = request.form['text']
@@ -193,16 +125,21 @@ def create_comment(ticket_id):
             status=400,
         )
     try:
-        comment = Comment(ticket_id=ticket.id, text=text, email=email)
+        comment = Comment(ticket_id=ticket_id, text=text, email=email)
     except Exception as e:
         return Response(response=str(e), status=400)
     db.session.add(comment)
     db.session.commit()
     db.session.refresh(comment)
+    json_comment = json.dumps(db_obj_to_dict(comment), default=custom_encoder)
+    # Подразумевается, что при удалении тикета, все комменты так же каскадно
+    # удалятся из redis, как из бд, поэтому expire тут не задаём
+    # это нужно и для правильной работы функции get_ticket_response
+    redis_client.set(
+        f'ticket_{comment.ticket_id}_comment_{comment.id}', json_comment
+    )
     return Response(
-        response=json.dumps(db_obj_to_dict(comment), default=custom_encoder),
-        status=201,
-        content_type='application/json',
+        response=json_comment, status=201, content_type='application/json'
     )
 
 
