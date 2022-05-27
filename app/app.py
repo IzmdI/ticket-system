@@ -4,12 +4,12 @@ from flask import Response, json, request
 
 from .db_models import Comment, Ticket, TicketStatus, db
 from .helpers import (
+    REDIS_CLIENT,
     check_ticket_status,
     create_app,
     custom_encoder,
     db_obj_to_dict,
     get_ticket_response,
-    redis_client,
 )
 
 app = create_app()
@@ -36,11 +36,11 @@ def create_ticket():
     db.session.commit()
     db.session.refresh(ticket)
     json_ticket = json.dumps(db_obj_to_dict(ticket), default=custom_encoder)
-    redis_client.set(
+    REDIS_CLIENT.set(
         f'ticket_{ticket.id}', json_ticket, ex=app.config['REDIS_EXPIRE_TIME']
     )
     return Response(
-        response=get_ticket_response(ticket.id, redis_client),
+        response=get_ticket_response(ticket.id, REDIS_CLIENT),
         status=201,
         content_type='application/json',
     )
@@ -50,7 +50,7 @@ def create_ticket():
 def get_or_change_ticket(ticket_id):
     if request.method == 'GET':
         return Response(
-            response=get_ticket_response(ticket_id, redis_client),
+            response=get_ticket_response(ticket_id, REDIS_CLIENT),
             status=200,
             content_type='application/json',
         )
@@ -81,13 +81,13 @@ def get_or_change_ticket(ticket_id):
             json_ticket = json.dumps(
                 db_obj_to_dict(ticket), default=custom_encoder
             )
-            redis_client.set(
+            REDIS_CLIENT.set(
                 f'ticket_{ticket.id}',
                 json_ticket,
                 ex=app.config['REDIS_EXPIRE_TIME'],
             )
             return Response(
-                response=get_ticket_response(ticket_id, redis_client),
+                response=get_ticket_response(ticket_id, REDIS_CLIENT),
                 status=200,
                 content_type='application/json',
             )
@@ -105,7 +105,7 @@ def get_or_change_ticket(ticket_id):
 
 @app.route('/ticket/<int:ticket_id>/comment', methods=['POST'])
 def create_comment(ticket_id):
-    ticket = redis_client.get(f'ticket_{ticket_id}')
+    ticket = REDIS_CLIENT.get(f'ticket_{ticket_id}')
     if ticket:
         ticket_status = TicketStatus(json.loads(ticket)['status'])
     else:
@@ -132,7 +132,7 @@ def create_comment(ticket_id):
     # Подразумевается, что при удалении тикета, все комменты так же каскадно
     # удалятся из redis, как из бд, поэтому expire тут не задаём
     # это нужно и для правильной работы функции get_ticket_response
-    redis_client.set(
+    REDIS_CLIENT.set(
         f'ticket_{comment.ticket_id}_comment_{comment.id}', json_comment
     )
     return Response(

@@ -9,7 +9,7 @@ from redis import Redis
 
 from .db_models import Comment, Ticket, TicketStatus, db
 
-redis_client = redis.Redis().from_url(
+REDIS_CLIENT = redis.Redis().from_url(
     url=os.environ['REDIS_URL'],
     encoding='utf-8',
     decode_responses=True,
@@ -18,7 +18,7 @@ redis_client = redis.Redis().from_url(
 )
 
 
-def create_app():
+def create_app() -> Flask:
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "default")
     app.config['SQLALCHEMY_DATABASE_URI'] = ''.join(
@@ -43,7 +43,7 @@ def db_obj_to_dict(obj: db.Model) -> dict:
     }
 
 
-def custom_encoder(obj: Any) -> Any:
+def custom_encoder(obj: Any) -> str:
     if isinstance(obj, dt):
         return obj.isoformat()
     if isinstance(obj, Enum):
@@ -64,7 +64,7 @@ def check_ticket_status(
     )
 
 
-def get_ticket_response(ticket_id: int, redis_client: Redis):
+def get_ticket_response(ticket_id: int, redis_client: Redis) -> str:
     ticket = redis_client.get(f'ticket_{ticket_id}')
     if not ticket:
         ticket = Ticket.query.get_or_404(ticket_id)

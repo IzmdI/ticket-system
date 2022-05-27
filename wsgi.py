@@ -1,7 +1,7 @@
-from app.app import app, redis_client
+from app.app import REDIS_CLIENT, app
 
 if __name__ == '__main__':
     try:
         app.run()
     finally:
-        redis_client.close()
+        REDIS_CLIENT.close()
