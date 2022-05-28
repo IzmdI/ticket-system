@@ -37,9 +37,7 @@ def create_ticket():
     db.session.commit()
     db.session.refresh(ticket)
     json_ticket = json.dumps(db_obj_to_dict(ticket), default=custom_encoder)
-    REDIS_CLIENT.set(
-        f'ticket_{ticket.id}', json_ticket, ex=expire_time
-    )
+    REDIS_CLIENT.set(f'ticket_{ticket.id}', json_ticket, ex=expire_time)
     return Response(
         response=get_ticket_response(ticket.id, REDIS_CLIENT),
         status=201,
