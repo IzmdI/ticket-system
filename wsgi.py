@@ -1,4 +1,9 @@
-from app.app import REDIS_CLIENT, app
+from app.helpers import create_app
+from app.views import REDIS_CLIENT, bp
+
+app = create_app()
+app.register_blueprint(bp)
+
 
 if __name__ == '__main__':
     try:

@@ -7,7 +7,7 @@ import redis
 from flask import Flask, json
 from redis import Redis
 
-from .db_models import Comment, Ticket, TicketStatus, db
+from app.db_models import Comment, Ticket, TicketStatus, db
 
 REDIS_CLIENT = redis.Redis().from_url(
     url=os.environ['REDIS_URL'],
@@ -28,7 +28,6 @@ def create_app() -> Flask:
             f"{os.environ['POSTGRES_DB']}",
         )
     )
-    app.config['REDIS_EXPIRE_TIME'] = int(os.environ['REDIS_EXPIRE_TIME'])
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
     app.app_context().push()

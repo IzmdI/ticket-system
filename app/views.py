@@ -1,21 +1,22 @@
+import os
 from datetime import datetime as dt
 
-from flask import Response, json, request
+from flask import Blueprint, Response, json, request
 
-from .db_models import Comment, Ticket, TicketStatus, db
-from .helpers import (
+from app.db_models import Comment, Ticket, TicketStatus, db
+from app.helpers import (
     REDIS_CLIENT,
     check_ticket_status,
-    create_app,
     custom_encoder,
     db_obj_to_dict,
     get_ticket_response,
 )
 
-app = create_app()
+bp = Blueprint('api', __name__, url_prefix=f"/api/{os.environ['API_VERSION']}")
+expire_time = int(os.environ['REDIS_EXPIRE_TIME'])
 
 
-@app.route('/ticket', methods=['POST'])
+@bp.route('/ticket', methods=['POST'])
 def create_ticket():
     try:
         theme = request.form['theme']
@@ -37,7 +38,7 @@ def create_ticket():
     db.session.refresh(ticket)
     json_ticket = json.dumps(db_obj_to_dict(ticket), default=custom_encoder)
     REDIS_CLIENT.set(
-        f'ticket_{ticket.id}', json_ticket, ex=app.config['REDIS_EXPIRE_TIME']
+        f'ticket_{ticket.id}', json_ticket, ex=expire_time
     )
     return Response(
         response=get_ticket_response(ticket.id, REDIS_CLIENT),
@@ -46,7 +47,7 @@ def create_ticket():
     )
 
 
-@app.route('/ticket/<int:ticket_id>', methods=['GET', 'PUT'])
+@bp.route('/ticket/<int:ticket_id>', methods=['GET', 'PUT'])
 def get_or_change_ticket(ticket_id):
     if request.method == 'GET':
         return Response(
@@ -84,7 +85,7 @@ def get_or_change_ticket(ticket_id):
             REDIS_CLIENT.set(
                 f'ticket_{ticket.id}',
                 json_ticket,
-                ex=app.config['REDIS_EXPIRE_TIME'],
+                ex=expire_time,
             )
             return Response(
                 response=get_ticket_response(ticket_id, REDIS_CLIENT),
@@ -103,7 +104,7 @@ def get_or_change_ticket(ticket_id):
     )
 
 
-@app.route('/ticket/<int:ticket_id>/comment', methods=['POST'])
+@bp.route('/ticket/<int:ticket_id>/comment', methods=['POST'])
 def create_comment(ticket_id):
     ticket = REDIS_CLIENT.get(f'ticket_{ticket_id}')
     if ticket:

@@ -29,6 +29,8 @@ REDIS_URL=redis://redis-service
 REDIS_USER=default
 REDIS_PASSWORD=<YOUR_REDIS_PASSWORD>
 REDIS_EXPIRE_TIME=60  // set time for Redis TTL in seconds
+# For version control
+API_VERSION=v1
 ```
 
 Start building and setting up.
@@ -80,4 +82,4 @@ The following endpoints are available.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE.md file for details
+This project is licensed under the MIT License - see the LICENSE.md file for details  
