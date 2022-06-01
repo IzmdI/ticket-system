@@ -7,7 +7,9 @@ import redis
 from flask import Flask, json
 from redis import Redis
 
-from app.db_models import Comment, Ticket, TicketStatus, db
+from app.db_crud import crud_ticket
+from app.db_models import Ticket, TicketStatus, db
+
 
 REDIS_CLIENT = redis.Redis().from_url(
     url=os.environ['REDIS_URL'],
@@ -66,7 +68,7 @@ def check_ticket_status(
 def get_ticket_response(ticket_id: int, redis_client: Redis) -> str:
     ticket = redis_client.get(f'ticket_{ticket_id}')
     if not ticket:
-        ticket = Ticket.query.get_or_404(ticket_id)
+        ticket = crud_ticket.get(obj_id=ticket_id)
     comments = redis_client.mget(
         redis_client.scan(match=f'ticket_{ticket_id}_comment_*')[-1]
     )
@@ -75,11 +77,10 @@ def get_ticket_response(ticket_id: int, redis_client: Redis) -> str:
     else:
         comments = {
             'comments': [
-                db_obj_to_dict(comment)
-                for comment in Comment.query.filter(
-                    Comment.ticket_id == ticket_id
-                ).all()
+                db_obj_to_dict(comment) for comment in ticket.comments
             ]
+            if isinstance(ticket, Ticket)
+            else []
         }
     if isinstance(ticket, Ticket):
         return json.dumps(

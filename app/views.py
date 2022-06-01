@@ -3,7 +3,8 @@ from datetime import datetime as dt
 
 from flask import Blueprint, Response, json, request
 
-from app.db_models import Comment, Ticket, TicketStatus, db
+from app.db_crud import crud_comment, crud_ticket
+from app.db_models import TicketStatus, db
 from app.helpers import (
     REDIS_CLIENT,
     check_ticket_status,
@@ -11,6 +12,7 @@ from app.helpers import (
     db_obj_to_dict,
     get_ticket_response,
 )
+
 
 bp = Blueprint('api', __name__, url_prefix=f"/api/{os.environ['API_VERSION']}")
 expire_time = int(os.environ['REDIS_EXPIRE_TIME'])
@@ -30,12 +32,12 @@ def create_ticket():
             status=400,
         )
     try:
-        ticket = Ticket(theme=theme, text=text, email=email)
+        # ticket = Ticket(theme=theme, text=text, email=email)
+        ticket = crud_ticket.create(
+            db=db.session, theme=theme, text=text, email=email
+        )
     except Exception as e:
         return Response(response=str(e), status=400)
-    db.session.add(ticket)
-    db.session.commit()
-    db.session.refresh(ticket)
     json_ticket = json.dumps(db_obj_to_dict(ticket), default=custom_encoder)
     REDIS_CLIENT.set(f'ticket_{ticket.id}', json_ticket, ex=expire_time)
     return Response(
@@ -54,7 +56,7 @@ def get_or_change_ticket(ticket_id):
             content_type='application/json',
         )
     if request.method == 'PUT':
-        ticket = Ticket.query.get_or_404(ticket_id)
+        ticket = crud_ticket.get(obj_id=ticket_id)
         if ticket.status == TicketStatus.closed:
             return Response(
                 response='Closed ticket can\'t be changed.', status=400
@@ -73,10 +75,12 @@ def get_or_change_ticket(ticket_id):
                 status=400,
             )
         if check_ticket_status(ticket.status, new_status):
-            ticket.status = new_status
-            ticket.updated_at = dt.utcnow()
-            db.session.commit()
-            db.session.refresh(ticket)
+            crud_ticket.update(
+                db=db.session,
+                obj=ticket,
+                status=new_status,
+                updated_at=dt.utcnow(),
+            )
             json_ticket = json.dumps(
                 db_obj_to_dict(ticket), default=custom_encoder
             )
@@ -108,7 +112,7 @@ def create_comment(ticket_id):
     if ticket:
         ticket_status = TicketStatus(json.loads(ticket)['status'])
     else:
-        ticket = Ticket.query.get_or_404(ticket_id)
+        ticket = crud_ticket.get(obj_id=ticket_id)
         ticket_status = ticket.status
     if ticket_status == TicketStatus.closed:
         return Response(response='Commenting closed tickets is unavailable.')
@@ -121,12 +125,11 @@ def create_comment(ticket_id):
             status=400,
         )
     try:
-        comment = Comment(ticket_id=ticket_id, text=text, email=email)
+        comment = crud_comment.create(
+            db=db.session, ticket_id=ticket_id, text=text, email=email
+        )
     except Exception as e:
         return Response(response=str(e), status=400)
-    db.session.add(comment)
-    db.session.commit()
-    db.session.refresh(comment)
     json_comment = json.dumps(db_obj_to_dict(comment), default=custom_encoder)
     # Подразумевается, что при удалении тикета, все комменты так же каскадно
     # удалятся из redis, как из бд, поэтому expire тут не задаём
