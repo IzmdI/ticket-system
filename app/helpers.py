@@ -19,16 +19,20 @@ REDIS_CLIENT = redis.Redis().from_url(
 )
 
 
-def create_app() -> Flask:
+def create_app(for_tests: bool = False) -> Flask:
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "default")
-    app.config['SQLALCHEMY_DATABASE_URI'] = ''.join(
-        (
-            f"postgresql://{os.environ['POSTGRES_USER']}:",
-            f"{os.environ['POSTGRES_PASSWORD']}@db:5432/",
-            f"{os.environ['POSTGRES_DB']}",
+    if for_tests:
+        app.config['TESTING'] = True
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+    else:
+        app.config['SQLALCHEMY_DATABASE_URI'] = ''.join(
+            (
+                f"postgresql://{os.environ['POSTGRES_USER']}:",
+                f"{os.environ['POSTGRES_PASSWORD']}@db:5432/",
+                f"{os.environ['POSTGRES_DB']}",
+            )
         )
-    )
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
     app.app_context().push()

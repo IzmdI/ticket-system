@@ -110,7 +110,9 @@ def create_comment(ticket_id):
         ticket = crud_ticket.get(obj_id=ticket_id)
         ticket_status = ticket.status
     if ticket_status == TicketStatus.closed:
-        return Response(response='Commenting closed tickets is unavailable.')
+        return Response(
+            response='Commenting closed tickets is unavailable.', status=400
+        )
     try:
         text = request.form['text']
         email = request.form['email']
