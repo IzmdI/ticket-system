@@ -8,11 +8,9 @@ from app.db_models import TicketStatus, db
 from app.helpers import (
     REDIS_CLIENT,
     check_ticket_status,
-    custom_encoder,
-    db_obj_to_dict,
-    get_ticket_response,
+    get_comment_json,
+    get_ticket_json,
 )
-
 
 bp = Blueprint('api', __name__, url_prefix=f"/api/{os.environ['API_VERSION']}")
 expire_time = int(os.environ['REDIS_EXPIRE_TIME'])
@@ -37,10 +35,10 @@ def create_ticket():
         )
     except Exception as e:
         return Response(response=str(e), status=400)
-    json_ticket = json.dumps(db_obj_to_dict(ticket), default=custom_encoder)
+    json_ticket = get_ticket_json(ticket.id, REDIS_CLIENT)
     REDIS_CLIENT.set(f'ticket_{ticket.id}', json_ticket, ex=expire_time)
     return Response(
-        response=get_ticket_response(ticket.id, REDIS_CLIENT),
+        response=json_ticket,
         status=201,
         content_type='application/json',
     )
@@ -50,7 +48,7 @@ def create_ticket():
 def get_or_change_ticket(ticket_id):
     if request.method == 'GET':
         return Response(
-            response=get_ticket_response(ticket_id, REDIS_CLIENT),
+            response=get_ticket_json(ticket_id, REDIS_CLIENT),
             status=200,
             content_type='application/json',
         )
@@ -74,22 +72,20 @@ def get_or_change_ticket(ticket_id):
                 status=400,
             )
         if check_ticket_status(ticket.status, new_status):
-            crud_ticket.update(
+            upd_ticket = crud_ticket.update(
                 db=db.session,
                 obj=ticket,
                 status=new_status,
                 updated_at=dt.utcnow(),
             )
-            json_ticket = json.dumps(
-                db_obj_to_dict(ticket), default=custom_encoder
-            )
+            json_ticket = get_ticket_json(ticket_id, REDIS_CLIENT, upd_ticket)
             REDIS_CLIENT.set(
                 f'ticket_{ticket.id}',
                 json_ticket,
                 ex=expire_time,
             )
             return Response(
-                response=get_ticket_response(ticket_id, REDIS_CLIENT),
+                response=json_ticket,
                 status=200,
                 content_type='application/json',
             )
@@ -129,7 +125,7 @@ def create_comment(ticket_id):
         )
     except Exception as e:
         return Response(response=str(e), status=400)
-    json_comment = json.dumps(db_obj_to_dict(comment), default=custom_encoder)
+    json_comment = get_comment_json(comment)
     # Подразумевается, что при удалении тикета, все комменты так же каскадно
     # удалятся из redis, как из бд, поэтому expire тут не задаём
     # это нужно и для правильной работы функции get_ticket_response

@@ -5,7 +5,18 @@ from enum import Enum
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import validates
 
+
 db = SQLAlchemy()
+
+
+def email_validator(email):
+    if not email or not re.match(
+            r'^[A-Za-z0-9\.\+_-]+@[A-Za-z0-9\._-]+\.[a-zA-Z]*$', email
+    ):
+        raise AssertionError(
+            'Provided value is not a valid e-mail address.'
+        )
+    return email
 
 
 class TicketStatus(Enum):
@@ -34,13 +45,7 @@ class Ticket(db.Model):
 
     @validates('email')
     def validate_email(self, key, email):
-        if not email or not re.match(
-            r'^[A-Za-z0-9\.\+_-]+@[A-Za-z0-9\._-]+\.[a-zA-Z]*$', email
-        ):
-            raise AssertionError(
-                'Provided value is not a valid e-mail address.'
-            )
-        return email
+        return email_validator(email)
 
 
 class Comment(db.Model):
@@ -54,10 +59,4 @@ class Comment(db.Model):
 
     @validates('email')
     def validate_email(self, key, email):
-        if not email or not re.match(
-            r'^[A-Za-z0-9\.\+_-]+@[A-Za-z0-9\._-]+\.[a-zA-Z]*$', email
-        ):
-            raise AssertionError(
-                'Provided value is not a valid e-mail address.'
-            )
-        return email
+        return email_validator(email)

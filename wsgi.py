@@ -9,4 +9,5 @@ if __name__ == '__main__':
     try:
         app.run()
     finally:
+        REDIS_CLIENT.flushdb()
         REDIS_CLIENT.close()
