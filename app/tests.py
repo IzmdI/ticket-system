@@ -1,15 +1,11 @@
 import unittest
 from unittest.mock import patch
 
-from dotenv import load_dotenv
 from fakeredis import FakeRedis
 
-# # for aborting import and os/env errors
-load_dotenv()
-
+from app.db_crud import crud_comment, crud_ticket
 from app.helpers import create_app
 from app.views import bp, db
-from app.db_crud import crud_ticket, crud_comment
 
 
 @patch('app.views.REDIS_CLIENT', FakeRedis())
