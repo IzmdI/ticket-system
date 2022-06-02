@@ -35,7 +35,7 @@ class CRUDBase:
     def remove(
         self, db: Session, obj_id: int, redis_client: Redis, match_str: str
     ) -> int:
-        obj = self.get(db=db, obj_id=obj_id)
+        obj = self.get(obj_id=obj_id)
         db.delete(obj)
         db.commit()
         redis_client.delete(*redis_client.scan(match=match_str)[-1])

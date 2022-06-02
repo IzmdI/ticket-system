@@ -32,7 +32,6 @@ def create_ticket():
             status=400,
         )
     try:
-        # ticket = Ticket(theme=theme, text=text, email=email)
         ticket = crud_ticket.create(
             db=db.session, theme=theme, text=text, email=email
         )
