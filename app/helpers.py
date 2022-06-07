@@ -8,7 +8,7 @@ from redis import Redis
 from app.db_crud import crud_ticket
 from app.db_models import Ticket, TicketStatus, db
 from app.db_schemas import comment_schema, ticket_schema
-
+import fakeredis
 
 # REDIS_CLIENT = redis.Redis().from_url(
 #     url=os.environ['REDIS_URL'],
@@ -17,7 +17,7 @@ from app.db_schemas import comment_schema, ticket_schema
 #     username=os.environ['REDIS_USER'],
 #     password=os.environ['REDIS_PASSWORD'],
 # )
-REDIS_CLIENT = redis.Redis()
+REDIS_CLIENT = fakeredis.FakeRedis()
 
 
 def create_app(for_tests: bool = False) -> Flask:

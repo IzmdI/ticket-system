@@ -46,60 +46,59 @@ def create_ticket():
     )
 
 
-@bp.route('/ticket/<int:ticket_id>', methods=['GET', 'PUT'])
-def get_or_change_ticket(ticket_id):
-    if request.method == 'GET':
+@bp.route('/ticket/<int:ticket_id>', methods=['GET'])
+def get_ticket(ticket_id):
+    return Response(
+        response=get_ticket_json(ticket_id, REDIS_CLIENT),
+        status=200,
+        content_type='application/json',
+    )
+
+
+@bp.route('/ticket/<int:ticket_id>', methods=['PUT'])
+def change_ticket_status(ticket_id):
+    ticket = crud_ticket.get(obj_id=ticket_id)
+    if ticket.status == TicketStatus.closed:
         return Response(
-            response=get_ticket_json(ticket_id, REDIS_CLIENT),
-            status=200,
-            content_type='application/json',
+            response='Closed ticket can\'t be changed.', status=400
         )
-    if request.method == 'PUT':
-        ticket = crud_ticket.get(obj_id=ticket_id)
-        if ticket.status == TicketStatus.closed:
-            return Response(
-                response='Closed ticket can\'t be changed.', status=400
-            )
-        try:
-            new_status = TicketStatus(request.form['status'])
-        except ValueError:
-            return Response(
-                response=(
-                    f'{request.form["status"]} is not a valid status.',
-                    ' Valid only: "answered", "awaited", "closed".',
-                    ' Opened ticket can only be answered or closed.',
-                    ' Answered ticket can only be awaited or closed',
-                    ' Awaited ticket can only be answered or closed.',
-                ),
-                status=400,
-            )
-        if check_ticket_status(ticket.status, new_status):
-            upd_ticket = crud_ticket.update(
-                db=db.session,
-                obj=ticket,
-                status=new_status,
-                updated_at=dt.utcnow(),
-            )
-            json_ticket = get_ticket_json(ticket_id, REDIS_CLIENT, upd_ticket)
-            REDIS_CLIENT.set(
-                f'ticket_{ticket.id}',
-                json_ticket,
-                ex=expire_time,
-            )
-            return Response(
-                response=json_ticket,
-                status=200,
-                content_type='application/json',
-            )
+    try:
+        new_status = TicketStatus(request.form['status'])
+    except ValueError:
         return Response(
             response=(
-                f'{new_status.name} can\'t be assign ',
-                f'to {ticket.status.name} ticket.',
+                f'{request.form["status"]} is not a valid status.',
+                ' Valid only: "answered", "awaited", "closed".',
+                ' Opened ticket can only be answered or closed.',
+                ' Answered ticket can only be awaited or closed',
+                ' Awaited ticket can only be answered or closed.',
             ),
             status=400,
         )
+    if check_ticket_status(ticket.status, new_status):
+        upd_ticket = crud_ticket.update(
+            db=db.session,
+            obj=ticket,
+            status=new_status,
+            updated_at=dt.utcnow(),
+        )
+        json_ticket = get_ticket_json(ticket_id, REDIS_CLIENT, upd_ticket)
+        REDIS_CLIENT.set(
+            f'ticket_{ticket.id}',
+            json_ticket,
+            ex=expire_time,
+        )
+        return Response(
+            response=json_ticket,
+            status=200,
+            content_type='application/json',
+        )
     return Response(
-        response='Only GET and PUT methods is allowed.', status=405
+        response=(
+            f'{new_status.name} can\'t be assign ',
+            f'to {ticket.status.name} ticket.',
+        ),
+        status=400,
     )
 
 
@@ -142,11 +141,15 @@ if __name__ == '__main__':
     from app.helpers import create_app
 
     try:
+        REDIS_CLIENT.ping()
+    except:
+        raise
+    try:
         app = create_app()
         app.register_blueprint(bp)
         app.run(host='0.0.0.0', port=8000)
     except:
-        pass
+        raise
     finally:
         REDIS_CLIENT.flushdb()
         REDIS_CLIENT.close()
