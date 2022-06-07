@@ -12,8 +12,10 @@ from app.helpers import (
     get_ticket_json,
 )
 
-bp = Blueprint('api', __name__, url_prefix=f"/api/{os.environ['API_VERSION']}")
-expire_time = int(os.environ['REDIS_EXPIRE_TIME'])
+bp = Blueprint('api', __name__, url_prefix="/api/v1")
+# bp = Blueprint('api', __name__, url_prefix=f"/api/{os.environ['API_VERSION']}")
+expire_time = 30
+# expire_time = int(os.environ['REDIS_EXPIRE_TIME'])
 
 
 @bp.route('/ticket', methods=['POST'])
@@ -128,12 +130,24 @@ def create_comment(ticket_id):
     except Exception as e:
         return Response(response=str(e), status=400)
     json_comment = get_comment_json(comment)
-    # Подразумевается, что при удалении тикета, все комменты так же каскадно
-    # удалятся из redis, как из бд, поэтому expire тут не задаём
-    # это нужно и для правильной работы функции get_ticket_response
     REDIS_CLIENT.set(
         f'ticket_{comment.ticket_id}_comment_{comment.id}', json_comment
     )
     return Response(
         response=json_comment, status=201, content_type='application/json'
     )
+
+
+if __name__ == '__main__':
+    from app.helpers import create_app
+
+    try:
+        app = create_app()
+        app.register_blueprint(bp)
+        app.run(host='0.0.0.0', port=8000)
+    except:
+        pass
+    finally:
+        REDIS_CLIENT.flushdb()
+        REDIS_CLIENT.close()
+        db.drop_all()
