@@ -10,14 +10,17 @@ from app.db_models import Ticket, TicketStatus, db
 from app.db_schemas import comment_schema, ticket_schema
 import fakeredis
 
-# REDIS_CLIENT = redis.Redis().from_url(
-#     url=os.environ['REDIS_URL'],
-#     encoding='utf-8',
-#     decode_responses=True,
-#     username=os.environ['REDIS_USER'],
-#     password=os.environ['REDIS_PASSWORD'],
-# )
-REDIS_CLIENT = fakeredis.FakeRedis()
+
+def get_redis_client():
+    # client = redis.Redis().from_url(
+    #     url=os.environ['REDIS_URL'],
+    #     encoding='utf-8',
+    #     decode_responses=True,
+    #     username=os.environ['REDIS_USER'],
+    #     password=os.environ['REDIS_PASSWORD'],
+    # )
+    client = fakeredis.FakeRedis()
+    return client
 
 
 def create_app(for_tests: bool = False) -> Flask:
@@ -68,6 +71,7 @@ def get_ticket_json(
     comments = redis_client.mget(
         redis_client.scan(match=f'ticket_{ticket_id}_comment_*')[-1]
     )
+    redis_client.close()
     comments = {'comments': [json.loads(comment) for comment in comments]}
     return json.dumps({**json.loads(ticket), **comments})
 

@@ -6,9 +6,9 @@ from flask import Blueprint, Response, json, request
 from app.db_crud import crud_comment, crud_ticket
 from app.db_models import TicketStatus, db
 from app.helpers import (
-    REDIS_CLIENT,
     check_ticket_status,
     get_comment_json,
+    get_redis_client,
     get_ticket_json,
 )
 
@@ -37,8 +37,10 @@ def create_ticket():
         )
     except Exception as e:
         return Response(response=str(e), status=400)
-    json_ticket = get_ticket_json(ticket.id, REDIS_CLIENT, ticket)
-    REDIS_CLIENT.set(f'ticket_{ticket.id}', json_ticket, ex=expire_time)
+    redis_client = get_redis_client()
+    json_ticket = get_ticket_json(ticket.id, redis_client, ticket)
+    redis_client.set(f'ticket_{ticket.id}', json_ticket, ex=expire_time)
+    redis_client.close()
     return Response(
         response=json_ticket,
         status=201,
@@ -48,8 +50,9 @@ def create_ticket():
 
 @bp.route('/ticket/<int:ticket_id>', methods=['GET'])
 def get_ticket(ticket_id):
+    redis_client = get_redis_client()
     return Response(
-        response=get_ticket_json(ticket_id, REDIS_CLIENT),
+        response=get_ticket_json(ticket_id, redis_client),
         status=200,
         content_type='application/json',
     )
@@ -82,12 +85,14 @@ def change_ticket_status(ticket_id):
             status=new_status,
             updated_at=dt.utcnow(),
         )
-        json_ticket = get_ticket_json(ticket_id, REDIS_CLIENT, upd_ticket)
-        REDIS_CLIENT.set(
+        redis_client = get_redis_client()
+        json_ticket = get_ticket_json(ticket_id, redis_client, upd_ticket)
+        redis_client.set(
             f'ticket_{ticket.id}',
             json_ticket,
             ex=expire_time,
         )
+        redis_client.close()
         return Response(
             response=json_ticket,
             status=200,
@@ -104,7 +109,8 @@ def change_ticket_status(ticket_id):
 
 @bp.route('/ticket/<int:ticket_id>/comment', methods=['POST'])
 def create_comment(ticket_id):
-    ticket = REDIS_CLIENT.get(f'ticket_{ticket_id}')
+    redis_client = get_redis_client()
+    ticket = redis_client.get(f'ticket_{ticket_id}')
     if ticket:
         ticket_status = TicketStatus(json.loads(ticket)['status'])
     else:
@@ -129,9 +135,11 @@ def create_comment(ticket_id):
     except Exception as e:
         return Response(response=str(e), status=400)
     json_comment = get_comment_json(comment)
-    REDIS_CLIENT.set(
+    redis_client = get_redis_client()
+    redis_client.set(
         f'ticket_{comment.ticket_id}_comment_{comment.id}', json_comment
     )
+    redis_client.close()
     return Response(
         response=json_comment, status=201, content_type='application/json'
     )
@@ -141,7 +149,9 @@ if __name__ == '__main__':
     from app.helpers import create_app
 
     try:
-        REDIS_CLIENT.ping()
+        redis_client = get_redis_client()
+        redis_client.ping()
+        redis_client.close()
     except:
         raise
     try:
@@ -151,6 +161,6 @@ if __name__ == '__main__':
     except:
         raise
     finally:
-        REDIS_CLIENT.flushdb()
-        REDIS_CLIENT.close()
+        redis_client.flushdb()
+        redis_client.close()
         db.drop_all()
