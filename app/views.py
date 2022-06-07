@@ -37,7 +37,7 @@ def create_ticket():
         )
     except Exception as e:
         return Response(response=str(e), status=400)
-    json_ticket = get_ticket_json(ticket.id, REDIS_CLIENT)
+    json_ticket = get_ticket_json(ticket.id, REDIS_CLIENT, ticket)
     REDIS_CLIENT.set(f'ticket_{ticket.id}', json_ticket, ex=expire_time)
     return Response(
         response=json_ticket,
