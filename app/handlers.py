@@ -1,19 +1,15 @@
-import os
-from datetime import datetime as dt
 import json
+from datetime import datetime as dt
 from typing import Tuple
 
 from flask import Request, abort
 
-from app.db_crud import crud_comment, crud_ticket
 from app.db_models import TicketStatus, db
 from app.helpers import (
     check_ticket_status,
-    get_comment_as_dict,
     get_redis_client,
-    get_ticket_as_dict,
 )
-
+from app.utils import comment_utils, ticket_utils
 
 expire_time = 30
 # expire_time = int(os.environ['REDIS_EXPIRE_TIME'])
@@ -24,14 +20,14 @@ def create_new_ticket(request: Request) -> Tuple[dict, int]:
         theme = request.json['theme']
         text = request.json['text']
         email = request.json['email']
-        ticket = crud_ticket.create(
+        ticket = ticket_utils.create_db_obj(
             db=db.session, theme=theme, text=text, email=email
         )
     except KeyError as e:
         return {'error': f'{str(e)} is required.'}, 400
     except Exception as e:
         return {'error': str(e)}, 400
-    ticket = get_ticket_as_dict(ticket.id, ticket)
+    ticket = ticket_utils.as_dict(obj=ticket)
     redis_client = get_redis_client()
     redis_client.set(
         f'ticket_{ticket["id"]}', json.dumps(ticket), ex=expire_time
@@ -41,14 +37,14 @@ def create_new_ticket(request: Request) -> Tuple[dict, int]:
 
 
 def get_ticket(ticket_id: int) -> Tuple[dict, int]:
-    ticket = get_ticket_as_dict(ticket_id)
+    ticket = ticket_utils.as_dict(ticket_id=ticket_id)
     if not ticket:
         return abort(404)
     return ticket, 200
 
 
 def update_ticket_status(request: Request, ticket_id: int) -> Tuple[dict, int]:
-    ticket = crud_ticket.get(obj_id=ticket_id)
+    ticket = ticket_utils.get_db_obj(db=db.session, obj_id=ticket_id)
     if not ticket:
         return abort(404)
     if ticket.status == TicketStatus.closed:
@@ -59,22 +55,20 @@ def update_ticket_status(request: Request, ticket_id: int) -> Tuple[dict, int]:
         return {'error': f'{str(e)} is required.'}, 400
     except ValueError:
         return {
-            'error': (
-                f'{request.json["status"]} is not a valid status.',
-                ' Valid only: "answered", "awaited", "closed".',
-                ' Opened ticket can only be answered or closed.',
-                ' Answered ticket can only be awaited or closed',
-                ' Awaited ticket can only be answered or closed.',
-            )
+            'error': f'{request.json["status"]} is not a valid status.'
+            ' Valid only: answered, awaited, closed.'
+            ' Opened ticket can only be answered or closed.'
+            ' Answered ticket can only be awaited or closed'
+            ' Awaited ticket can only be answered or closed.'
         }, 400
     if check_ticket_status(ticket.status, new_status):
-        upd_ticket = crud_ticket.update(
+        upd_ticket = ticket_utils.update_db_obj(
             db=db.session,
             obj=ticket,
             status=new_status,
             updated_at=dt.utcnow(),
         )
-        ticket = get_ticket_as_dict(ticket_id, upd_ticket)
+        ticket = ticket_utils.as_dict(obj=upd_ticket)
         redis_client = get_redis_client()
         redis_client.set(
             f'ticket_{ticket["id"]}',
@@ -98,7 +92,7 @@ def add_comment(request: Request, ticket_id: int) -> Tuple[dict, int]:
     if ticket:
         ticket_status = TicketStatus(json.loads(ticket)['status'])
     else:
-        ticket = crud_ticket.get(db=db.session, obj_id=ticket_id)
+        ticket = ticket_utils.get_db_obj(db=db.session, obj_id=ticket_id)
         if not ticket:
             return abort(404)
         ticket_status = ticket.status
@@ -107,14 +101,14 @@ def add_comment(request: Request, ticket_id: int) -> Tuple[dict, int]:
     try:
         text = request.json['text']
         email = request.json['email']
-        comment = crud_comment.create(
+        comment = comment_utils.create_db_obj(
             db=db.session, ticket_id=ticket_id, text=text, email=email
         )
     except KeyError as e:
         return {'error': f'{str(e)} is required.'}, 400
     except Exception as e:
         return {'error': str(e)}, 400
-    comment = get_comment_as_dict(comment)
+    comment = comment_utils.as_dict(obj=comment)
     redis_client = get_redis_client()
     redis_client.set(
         f'ticket_{comment["ticket_id"]}_comment_{comment["id"]}',

@@ -1,12 +1,9 @@
 import os
-from typing import Optional
 
 import redis
-from flask import Flask, json
+from flask import Flask
 
-from app.db_crud import crud_ticket
-from app.db_models import Ticket, TicketStatus, db
-from app.db_schemas import comment_schema, ticket_schema
+from app.db_models import TicketStatus, db
 import fakeredis
 
 
@@ -52,26 +49,3 @@ def check_ticket_status(
     if current_status == TicketStatus.answered:
         return new_status in (TicketStatus.awaited, TicketStatus.closed)
     return False
-
-
-def get_ticket_as_dict(ticket_id: int, obj: Optional[Ticket] = None) -> dict:
-    if obj:
-        return ticket_schema.dump(obj)
-    redis_client = get_redis_client()
-    ticket = redis_client.get(f'ticket_{ticket_id}')
-    if not ticket:
-        redis_client.close()
-        ticket = crud_ticket.get(db=db.session, obj_id=ticket_id)
-        if not ticket:
-            return {}
-        return ticket_schema.dump(ticket)
-    comments = redis_client.mget(
-        redis_client.scan(match=f'ticket_{ticket_id}_comment_*')[-1]
-    )
-    redis_client.close()
-    comments = {'comments': [json.loads(comment) for comment in comments]}
-    return {**json.loads(ticket), **comments}  # noqa
-
-
-def get_comment_as_dict(comment) -> dict:
-    return comment_schema.dump(comment)
