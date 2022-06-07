@@ -21,13 +21,13 @@ expire_time = 30
 @bp.route('/ticket', methods=['POST'])
 def create_ticket():
     try:
-        theme = request.form['theme']
-        text = request.form['text']
-        email = request.form['email']
+        theme = request.json['theme']
+        text = request.json['text']
+        email = request.json['email']
     except:
         return Response(
             response=(
-                '"theme", "text" and "email" is required as form-data strings.'
+                '"theme", "text" and "email" is required as json-data strings.'
             ),
             status=400,
         )
@@ -115,11 +115,11 @@ def create_comment(ticket_id):
             response='Commenting closed tickets is unavailable.', status=400
         )
     try:
-        text = request.form['text']
-        email = request.form['email']
+        text = request.json['text']
+        email = request.json['email']
     except:
         return Response(
-            response='"text" and "email" is required as form-data strings.',
+            response='"text" and "email" is required as json-data strings.',
             status=400,
         )
     try:
