@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime as dt
 from typing import Tuple
 
@@ -11,8 +12,8 @@ from app.helpers import (
 )
 from app.utils import comment_utils, ticket_utils
 
-expire_time = 30
-# expire_time = int(os.environ['REDIS_EXPIRE_TIME'])
+
+expire_time = int(os.environ['REDIS_EXPIRE_TIME'])
 
 
 def create_new_ticket(request: Request) -> Tuple[dict, int]:

@@ -4,18 +4,16 @@ import redis
 from flask import Flask
 
 from app.db_models import TicketStatus, db
-import fakeredis
 
 
 def get_redis_client():
-    # client = redis.Redis().from_url(
-    #     url=os.environ['REDIS_URL'],
-    #     encoding='utf-8',
-    #     decode_responses=True,
-    #     username=os.environ['REDIS_USER'],
-    #     password=os.environ['REDIS_PASSWORD'],
-    # )
-    client = fakeredis.FakeRedis()
+    client = redis.Redis().from_url(
+        url=os.environ['REDIS_URL'],
+        encoding='utf-8',
+        decode_responses=True,
+        username=os.environ['REDIS_USER'],
+        password=os.environ['REDIS_PASSWORD'],
+    )
     return client
 
 
@@ -26,13 +24,13 @@ def create_app(for_tests: bool = False) -> Flask:
         app.config['TESTING'] = True
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
     else:
-        # app.config['SQLALCHEMY_DATABASE_URI'] = ''.join(
-        #     (
-        #         f"postgresql://{os.environ['POSTGRES_USER']}:",
-        #         f"{os.environ['POSTGRES_PASSWORD']}@db:5432/",
-        #         f"{os.environ['POSTGRES_DB']}",
-        #     )
-        # )
+        app.config['SQLALCHEMY_DATABASE_URI'] = ''.join(
+            (
+                f"postgresql://{os.environ['POSTGRES_USER']}:",
+                f"{os.environ['POSTGRES_PASSWORD']}@db:5432/",
+                f"{os.environ['POSTGRES_DB']}",
+            )
+        )
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)

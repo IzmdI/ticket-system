@@ -5,8 +5,8 @@ from flask import Blueprint, request
 from app import handlers
 from app.db_models import db
 
-bp = Blueprint('api', __name__, url_prefix="/api/v1")
-# bp = Blueprint('api', __name__, url_prefix=f"/api/{os.environ['API_VERSION']}")
+
+bp = Blueprint('api', __name__, url_prefix=f"/api/{os.environ['API_VERSION']}")
 
 
 @bp.route('/ticket', methods=['POST'])
