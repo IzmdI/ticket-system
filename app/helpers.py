@@ -3,7 +3,6 @@ from typing import Optional
 
 import redis
 from flask import Flask, json
-from redis import Redis
 
 from app.db_crud import crud_ticket
 from app.db_models import Ticket, TicketStatus, db
@@ -48,15 +47,11 @@ def create_app(for_tests: bool = False) -> Flask:
 def check_ticket_status(
     current_status: TicketStatus, new_status: TicketStatus
 ) -> bool:
-    return (
-        new_status in (TicketStatus.answered, TicketStatus.closed)
-        and (
-            current_status == TicketStatus.opened
-            or current_status == TicketStatus.awaited
-        )
-        or new_status in (TicketStatus.awaited, TicketStatus.closed)
-        and current_status == TicketStatus.answered
-    )
+    if current_status in (TicketStatus.opened, TicketStatus.awaited):
+        return new_status in (TicketStatus.answered, TicketStatus.closed)
+    if current_status == TicketStatus.answered:
+        return new_status in (TicketStatus.awaited, TicketStatus.closed)
+    return False
 
 
 def get_ticket_as_dict(ticket_id: int, obj: Optional[Ticket] = None) -> dict:
