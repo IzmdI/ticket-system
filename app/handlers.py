@@ -3,7 +3,7 @@ from datetime import datetime as dt
 import json
 from typing import Tuple
 
-from flask import Request
+from flask import Request, abort
 
 from app.db_crud import crud_comment, crud_ticket
 from app.db_models import TicketStatus, db
@@ -41,11 +41,16 @@ def create_new_ticket(request: Request) -> Tuple[dict, int]:
 
 
 def get_ticket(ticket_id: int) -> Tuple[dict, int]:
-    return get_ticket_as_dict(ticket_id), 200
+    ticket = get_ticket_as_dict(ticket_id)
+    if not ticket:
+        return abort(404)
+    return ticket, 200
 
 
 def update_ticket_status(request: Request, ticket_id: int) -> Tuple[dict, int]:
     ticket = crud_ticket.get(obj_id=ticket_id)
+    if not ticket:
+        return abort(404)
     if ticket.status == TicketStatus.closed:
         return {'error': 'closed ticket can\'t be changed.'}, 400
     try:
@@ -89,10 +94,13 @@ def update_ticket_status(request: Request, ticket_id: int) -> Tuple[dict, int]:
 def add_comment(request: Request, ticket_id: int) -> Tuple[dict, int]:
     redis_client = get_redis_client()
     ticket = redis_client.get(f'ticket_{ticket_id}')
+    redis_client.close()
     if ticket:
         ticket_status = TicketStatus(json.loads(ticket)['status'])
     else:
-        ticket = crud_ticket.get(obj_id=ticket_id)
+        ticket = crud_ticket.get(db=db.session, obj_id=ticket_id)
+        if not ticket:
+            return abort(404)
         ticket_status = ticket.status
     if ticket_status == TicketStatus.closed:
         return {'error': 'commenting closed tickets is unavailable.'}, 400

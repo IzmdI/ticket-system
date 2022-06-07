@@ -60,8 +60,10 @@ def get_ticket_as_dict(ticket_id: int, obj: Optional[Ticket] = None) -> dict:
     redis_client = get_redis_client()
     ticket = redis_client.get(f'ticket_{ticket_id}')
     if not ticket:
-        ticket = crud_ticket.get(obj_id=ticket_id)
         redis_client.close()
+        ticket = crud_ticket.get(db=db.session, obj_id=ticket_id)
+        if not ticket:
+            return {}
         return ticket_schema.dump(ticket)
     comments = redis_client.mget(
         redis_client.scan(match=f'ticket_{ticket_id}_comment_*')[-1]

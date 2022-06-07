@@ -29,6 +29,16 @@ def create_comment(ticket_id):
     return handlers.add_comment(request, ticket_id)
 
 
+@bp.errorhandler(404)
+def not_found(e):
+    return {e.name: e.description}, e.code
+
+
+@bp.errorhandler(500)
+def internal_error(e):
+    return {e.name: e.description}, e.code
+
+
 if __name__ == '__main__':
     from app.helpers import create_app, get_redis_client
 

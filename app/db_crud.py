@@ -20,8 +20,8 @@ class CRUDBase:
         db.refresh(obj)
         return obj
 
-    def get(self, obj_id: int) -> Optional[Model]:
-        return self.model.query.get_or_404(obj_id)
+    def get(self, db: Session, obj_id: int) -> Optional[Model]:
+        return db.query(self.model).filter(self.model.id == obj_id).first()
 
     @staticmethod
     def update(db: Session, obj: Model, **kwargs) -> Model:
