@@ -59,22 +59,22 @@ def check_ticket_status(
     )
 
 
-def get_ticket_json(
-    ticket_id: int, redis_client: Redis, obj: Optional[Ticket] = None
-) -> str:
+def get_ticket_as_dict(ticket_id: int, obj: Optional[Ticket] = None) -> dict:
     if obj:
-        return json.dumps(ticket_schema.dump(obj))
+        return ticket_schema.dump(obj)
+    redis_client = get_redis_client()
     ticket = redis_client.get(f'ticket_{ticket_id}')
     if not ticket:
         ticket = crud_ticket.get(obj_id=ticket_id)
-        return json.dumps(ticket_schema.dump(ticket))
+        redis_client.close()
+        return ticket_schema.dump(ticket)
     comments = redis_client.mget(
         redis_client.scan(match=f'ticket_{ticket_id}_comment_*')[-1]
     )
     redis_client.close()
     comments = {'comments': [json.loads(comment) for comment in comments]}
-    return json.dumps({**json.loads(ticket), **comments})
+    return {**json.loads(ticket), **comments}  # noqa
 
 
-def get_comment_json(comment) -> str:
-    return json.dumps(comment_schema.dump(comment))
+def get_comment_as_dict(comment) -> dict:
+    return comment_schema.dump(comment)
