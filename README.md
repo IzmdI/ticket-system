@@ -1,6 +1,6 @@
 # Ticket system
 
-This is a simple API service, which allows to send tickets, update them statuses and comments them.  
+This is a simple API service, which allows to send tickets, update statuses, delete and comments they.  
 By default ticket creating with status 'opened'.  
 * Opened ticket can be 'answered' or 'closed'. 
 * Answered ticket can be 'awaited' or 'closed'. 
@@ -72,6 +72,7 @@ The following endpoints are available.
 
 * [Flask](https://palletsprojects.com/p/flask/) - lightweight WSGI web application framework
 * [Flask-SQLAlchemy](https://flask-sqlalchemy.palletsprojects.com/en/2.x/) - extension for Flask that adds support for [SQLAlchemy](https://www.sqlalchemy.org/)
+* [Marshmallow-sqlalchemy](https://github.com/marshmallow-code/marshmallow-sqlalchemy) - [SQLAlchemy](https://www.sqlalchemy.org/) integration with the [Marshmallow](https://github.com/marshmallow-code/marshmallow) (de)serialization library
 * [Redis](https://redis.io/) - in-memory data storage and message broker
 * [uWSGI](https://uwsgi-docs.readthedocs.io/en/latest/) - service for web-applications hosting
 * [Docker](https://www.docker.com/) - Containerized system
