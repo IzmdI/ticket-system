@@ -31,7 +31,6 @@ def create_app(for_tests: bool = False) -> Flask:
                 f"{os.environ['POSTGRES_DB']}",
             )
         )
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
     app.app_context().push()
