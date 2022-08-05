@@ -11,6 +11,6 @@ RUN apt-get update --fix-missing && apt-get install -y -f \
 
 COPY . .
 
-RUN python3 -m pip install --upgrade pip \
-    && pip install -r requirements.txt --no-cache-dir \
-    && rm requirements.txt
+RUN yes | pip install --no-cache-dir poetry \
+    && poetry config virtualenvs.create false \
+    && poetry install --no-dev --no-interaction --no-ansi

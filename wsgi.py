@@ -1,6 +1,7 @@
 from app.helpers import create_app
-from app.views import bp
 from app.tests import tests
+from app.views import bp
+
 
 app = create_app()
 app.register_blueprint(bp)

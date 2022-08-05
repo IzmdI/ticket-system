@@ -1,8 +1,0 @@
-Flask==2.1.2
-Flask-SQLAlchemy==2.5.1
-psycopg2-binary==2.9.3
-redis==4.3.1
-uWSGI==2.0.20
-marshmallow-sqlalchemy==0.28.0
-marshmallow-enum==1.5.1
-fakeredis==1.8

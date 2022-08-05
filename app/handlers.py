@@ -6,10 +6,7 @@ from typing import Tuple
 from flask import Request, abort
 
 from app.db_models import TicketStatus, db
-from app.helpers import (
-    check_ticket_status,
-    get_redis_client,
-)
+from app.helpers import check_ticket_status, get_redis_client
 from app.utils import comment_utils, ticket_utils
 
 
@@ -22,7 +19,10 @@ def create_new_ticket(request: Request) -> Tuple[dict, int]:
         text = request.json['text']
         email = request.json['email']
         ticket = ticket_utils.create_db_obj(
-            db=db.session, theme=theme, text=text, email=email
+            db=db.session,
+            theme=theme,
+            text=text,
+            email=email,
         )
     except KeyError as e:
         return {'error': f'{str(e)} is required.'}, 400
@@ -31,7 +31,9 @@ def create_new_ticket(request: Request) -> Tuple[dict, int]:
     ticket = ticket_utils.as_dict(obj=ticket)
     redis_client = get_redis_client()
     redis_client.set(
-        f'ticket_{ticket["id"]}', json.dumps(ticket), ex=expire_time
+        f'ticket_{ticket["id"]}',
+        json.dumps(ticket),
+        ex=expire_time,
     )
     redis_client.close()
     return ticket, 201
@@ -60,7 +62,7 @@ def update_ticket_status(request: Request, ticket_id: int) -> Tuple[dict, int]:
             ' Valid only: answered, awaited, closed.'
             ' Opened ticket can only be answered or closed.'
             ' Answered ticket can only be awaited or closed'
-            ' Awaited ticket can only be answered or closed.'
+            ' Awaited ticket can only be answered or closed.',
         }, 400
     if check_ticket_status(ticket.status, new_status):
         upd_ticket = ticket_utils.update_db_obj(
@@ -82,7 +84,7 @@ def update_ticket_status(request: Request, ticket_id: int) -> Tuple[dict, int]:
         'error': (
             f'{new_status.name} can\'t be assign ',
             f'to {ticket.status.name} ticket.',
-        )
+        ),
     }, 400
 
 
@@ -103,7 +105,10 @@ def add_comment(request: Request, ticket_id: int) -> Tuple[dict, int]:
         text = request.json['text']
         email = request.json['email']
         comment = comment_utils.create_db_obj(
-            db=db.session, ticket_id=ticket_id, text=text, email=email
+            db=db.session,
+            ticket_id=ticket_id,
+            text=text,
+            email=email,
         )
     except KeyError as e:
         return {'error': f'{str(e)} is required.'}, 400

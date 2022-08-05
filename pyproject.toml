@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "ticket-system"
+version = "0.1.0"
+description = ""
+authors = ["andrei.smelov <andrei.smelov@acronis.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+Flask = "^2.2.1"
+Flask-SQLAlchemy = "^2.5.1"
+redis = "^4.3.4"
+fakeredis = "^1.9.0"
+psycopg2-binary = "^2.9.3"
+marshmallow-enum = "^1.5.1"
+marshmallow-sqlalchemy = "^0.28.1"
+flake8 = "^5.0.4"
+
+[tool.poetry.dev-dependencies]
+gray = {git = "https://github.com/dizballanze/gray.git"}
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

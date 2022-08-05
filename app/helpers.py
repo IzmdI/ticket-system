@@ -19,7 +19,7 @@ def get_redis_client():
 
 def create_app(for_tests: bool = False) -> Flask:
     app = Flask(__name__)
-    app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY", "default")
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default')
     if for_tests:
         app.config['TESTING'] = True
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
@@ -29,7 +29,7 @@ def create_app(for_tests: bool = False) -> Flask:
                 f"postgresql://{os.environ['POSTGRES_USER']}:",
                 f"{os.environ['POSTGRES_PASSWORD']}@db:5432/",
                 f"{os.environ['POSTGRES_DB']}",
-            )
+            ),
         )
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
@@ -39,7 +39,8 @@ def create_app(for_tests: bool = False) -> Flask:
 
 
 def check_ticket_status(
-    current_status: TicketStatus, new_status: TicketStatus
+    current_status: TicketStatus,
+    new_status: TicketStatus,
 ) -> bool:
     if current_status in (TicketStatus.opened, TicketStatus.awaited):
         return new_status in (TicketStatus.answered, TicketStatus.closed)

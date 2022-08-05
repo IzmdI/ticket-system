@@ -66,7 +66,7 @@ class TestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_get_ticket(self):
-        response = self.client.get(f'api/v1/ticket/3')
+        response = self.client.get('api/v1/ticket/3')
         self.assertEqual(response.status_code, 404)
         response = self.client.get(f'api/v1/ticket/{self.ticket.id}')
         self.assertEqual(response.status_code, 200)
